@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fraud Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface2: #222538;
+    --border: #2d3154;
+    --accent: #e84393;
+    --accent2: #7c3aed;
+    --accent3: #06b6d4;
+    --accent4: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1d2e 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .badge {
+    background: rgba(232,67,147,0.15);
+    border: 1px solid rgba(232,67,147,0.3);
+    color: var(--accent);
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .tabs {
+    display: flex; gap: 4px; padding: 12px 28px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s; border: none;
+    background: transparent; color: var(--muted);
+  }
+  .tab:hover { background: var(--surface2); color: var(--text); }
+  .tab.active {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+  }
+  .main { padding: 24px 28px; max-width: 1600px; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px;
+    position: relative; overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--card-shadow); }
+  .kpi-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .kpi-card.red::before { background: linear-gradient(90deg, var(--red), #ff6b6b); }
+  .kpi-card.purple::before { background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+  .kpi-card.cyan::before { background: linear-gradient(90deg, var(--accent3), #38bdf8); }
+  .kpi-card.amber::before { background: linear-gradient(90deg, var(--accent4), #fcd34d); }
+  .kpi-card.green::before { background: linear-gradient(90deg, var(--green), #34d399); }
+  .kpi-icon {
+    font-size: 24px; margin-bottom: 12px;
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .kpi-icon.red { background: rgba(239,68,68,0.15); }
+  .kpi-icon.purple { background: rgba(124,58,237,0.15); }
+  .kpi-icon.cyan { background: rgba(6,182,212,0.15); }
+  .kpi-icon.amber { background: rgba(245,158,11,0.15); }
+  .kpi-icon.green { background: rgba(16,185,129,0.15); }
+  .kpi-label { font-size: 12px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-value { font-size: 28px; font-weight: 800; margin: 6px 0 4px; line-height: 1; }
+  .kpi-value.red { color: var(--red); }
+  .kpi-value.purple { color: var(--accent); }
+  .kpi-value.cyan { color: var(--accent3); }
+  .kpi-value.amber { color: var(--accent4); }
+  .kpi-value.green { color: var(--green); }
+  .kpi-sub { font-size: 12px; color: var(--muted); }
+  .kpi-trend { font-size: 11px; margin-top: 6px; }
+  .trend-up { color: var(--red); }
+  .trend-down { color: var(--green); }
+  .chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .chart-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .chart-grid-full { margin-bottom: 16px; }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px;
+    transition: box-shadow 0.2s;
+  }
+  .chart-card:hover { box-shadow: var(--card-shadow); }
+  .chart-card.span2 { grid-column: span 2; }
+  .chart-title {
+    font-size: 14px; font-weight: 600; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chart-title .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .chart-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 240px; }
+  .chart-wrap.tall { height: 300px; }
+  .chart-wrap.xtall { height: 360px; }
+  .insight-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip {
+    padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    border: 1px solid; display: flex; align-items: center; gap: 6px;
+  }
+  .chip.red { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #f87171; }
+  .chip.amber { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: #fbbf24; }
+  .chip.cyan { background: rgba(6,182,212,0.1); border-color: rgba(6,182,212,0.3); color: #22d3ee; }
+  .chip.green { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #34d399; }
+  .chip.purple { background: rgba(124,58,237,0.1); border-color: rgba(124,58,237,0.3); color: #a78bfa; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600;
+       text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted);
+       border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid rgba(45,49,84,0.5); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .risk-bar {
+    height: 6px; border-radius: 3px; background: var(--border); overflow: hidden;
+    width: 80px; display: inline-block; vertical-align: middle; margin-right: 8px;
+  }
+  .risk-fill { height: 100%; border-radius: 3px; }
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title { font-size: 16px; font-weight: 700; }
+  .section-tag {
+    font-size: 11px; color: var(--muted);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 6px;
+  }
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: 60px repeat(24, 1fr);
+    gap: 2px; font-size: 10px;
+  }
+  .heatmap-cell {
+    height: 28px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 600; color: white;
+    cursor: default; transition: opacity 0.2s;
+  }
+  .heatmap-cell:hover { opacity: 0.8; }
+  .heatmap-label { display: flex; align-items: center; font-size: 11px; color: var(--muted); }
+  .doughnut-legend { margin-top: 12px; }
+  .doughnut-legend-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 0; font-size: 12px; border-bottom: 1px solid rgba(45,49,84,0.4);
+  }
+  .doughnut-legend-item:last-child { border-bottom: none; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+  .legend-left { display: flex; align-items: center; }
+  .legend-val { font-weight: 700; color: var(--text); }
+  .dax-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dax-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+  }
+  .dax-name { font-size: 12px; color: var(--accent3); font-weight: 600; margin-bottom: 6px; }
+  .dax-formula {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 11px; color: #e2e8f0; line-height: 1.6;
+    background: rgba(0,0,0,0.3); padding: 10px 12px; border-radius: 6px;
+    white-space: pre-wrap;
+  }
+  .dax-formula .kw { color: #c792ea; }
+  .dax-formula .fn { color: #82aaff; }
+  .dax-formula .str { color: #c3e88d; }
+  .dax-formula .num { color: #f78c6c; }
+  .dax-formula .cmt { color: #546e7a; font-style: italic; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .gauge-wrap { text-align: center; padding: 10px 0; }
+  .gauge-arc { filter: drop-shadow(0 0 8px rgba(232,67,147,0.4)); }
+  @media (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .chart-grid-2 { grid-template-columns: 1fr; }
+    .chart-grid-3 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">🛡️</div>
+    <div>
+      <h1>FraudGuard Analytics</h1>
+      <div class="header-sub">Transaction Fraud Intelligence Dashboard · 118,834 records</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-dot"></div>
+    <div class="badge">⚠ 10,443 Fraud Cases Detected</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showPage('overview')">📊 Overview</button>
+  <button class="tab" onclick="showPage('patterns')">🔍 Fraud Patterns</button>
+  <button class="tab" onclick="showPage('geo')">📍 Geographic</button>
+  <button class="tab" onclick="showPage('risk')">🚨 Risk Profiles</button>
+</div>
+
+<div class="main">
+
+<!-- ═══════════════ OVERVIEW PAGE ═══════════════ -->
+<div class="page active" id="page-overview">
+
+  <div class="insight-chips">
+    <div class="chip red">🚨 8.79% Overall Fraud Rate</div>
+    <div class="chip amber">🌙 5AM–6AM Peak Fraud Hours (9.4%)</div>
+    <div class="chip cyan">📱 Mobile = #1 Fraud Device (5,473 cases)</div>
+    <div class="chip purple">🏠 Home Appliances = Riskiest Category (9.6%)</div>
+    <div class="chip green">💰 ₹18.31 Cr Lost to Fraud</div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card red">
+      <div class="kpi-icon red">🚨</div>
+      <div class="kpi-label">Total Fraud Cases</div>
+      <div class="kpi-value red">10,443</div>
+      <div class="kpi-sub">out of 118,834 transactions</div>
+      <div class="kpi-trend trend-up">↑ Fraud Rate: 8.79%</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-icon purple">💸</div>
+      <div class="kpi-label">Fraud Amount Lost</div>
+      <div class="kpi-value purple">₹18.31 Cr</div>
+      <div class="kpi-sub">of ₹217.3 Cr total volume</div>
+      <div class="kpi-trend trend-up">↑ 8.43% of total value</div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-icon cyan">💳</div>
+      <div class="kpi-label">Avg Fraud Txn Amount</div>
+      <div class="kpi-value cyan">₹20,243</div>
+      <div class="kpi-sub">Legit avg: ₹21,220</div>
+      <div class="kpi-trend" style="color:var(--muted)">→ Similar to legit txns</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-icon amber">📊</div>
+      <div class="kpi-label">Total Transactions</div>
+      <div class="kpi-value amber">1,18,834</div>
+      <div class="kpi-sub">Jul 2023 – Dec 2024</div>
+      <div class="kpi-trend" style="color:var(--muted)">18 months of data</div>
+    </div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent)"></div>Fraud vs Legitimate Transactions</div>
+      <div class="chart-sub">DAX: Fraud Rate = DIVIDE(Fraud Count, Total Count, 0)</div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:28px; padding:12px 0;">
+        <div style="position:relative; width:220px; height:220px; flex-shrink:0;">
+          <canvas id="donutMain"></canvas>
+          <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none;">
+            <div style="font-size:26px; font-weight:800; color:#ef4444; line-height:1;">8.79%</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:2px;">Fraud Rate</div>
+          </div>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+              <div style="width:12px;height:12px;border-radius:3px;background:#ef4444;flex-shrink:0;"></div>
+              <span style="font-size:13px; font-weight:600; color:var(--text);">Failed (Fraud)</span>
+            </div>
+            <div style="font-size:22px; font-weight:800; color:#f87171; line-height:1;">10,443</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px;">8.79% of all transactions</div>
+            <div style="margin-top:6px; height:5px; border-radius:3px; background:var(--border);">
+              <div style="width:8.79%; height:100%; background:#ef4444; border-radius:3px;"></div>
+            </div>
+          </div>
+          <div style="margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+              <div style="width:12px;height:12px;border-radius:3px;background:#10b981;flex-shrink:0;"></div>
+              <span style="font-size:13px; font-weight:600; color:var(--text);">Success</span>
+            </div>
+            <div style="font-size:22px; font-weight:800; color:#34d399; line-height:1;">1,03,715</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px;">87.27% of all transactions</div>
+            <div style="margin-top:6px; height:5px; border-radius:3px; background:var(--border);">
+              <div style="width:87.27%; height:100%; background:#10b981; border-radius:3px;"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+              <div style="width:12px;height:12px;border-radius:3px;background:#f59e0b;flex-shrink:0;"></div>
+              <span style="font-size:13px; font-weight:600; color:var(--text);">Pending</span>
+            </div>
+            <div style="font-size:22px; font-weight:800; color:#fbbf24; line-height:1;">4,676</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px;">3.93% of all transactions</div>
+            <div style="margin-top:6px; height:5px; border-radius:3px; background:var(--border);">
+              <div style="width:3.93%; height:100%; background:#f59e0b; border-radius:3px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent3)"></div>Monthly Fraud Trend</div>
+      <div class="chart-sub">DAX: Monthly Fraud Rate = DIVIDE([Fraud Count], [Total Txns])*100</div>
+      <div class="chart-wrap xtall"><canvas id="monthlyTrend"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-grid-3">
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:#7c3aed"></div>By Device Type</div>
+      <div class="chart-sub">DAX: Device Fraud % = DIVIDE([Fraud], [Total])</div>
+      <div class="chart-wrap"><canvas id="deviceChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent4)"></div>By Payment Method</div>
+      <div class="chart-sub">DAX: Payment Fraud Rate = CALCULATE([Fraud Rate], FILTER(...))</div>
+      <div class="chart-wrap"><canvas id="paymentChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent)"></div>By Transaction Amount</div>
+      <div class="chart-sub">DAX: Amount Band Fraud Rate</div>
+      <div class="chart-wrap"><canvas id="bucketChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PATTERNS PAGE ═══════════════ -->
+<div class="page" id="page-patterns">
+  <div class="section-header">
+    <div class="section-title">🔍 Fraud Pattern Analysis</div>
+    <div class="section-tag">Temporal · Category · Behavioral Signals</div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent)"></div>Fraud by Hour of Day</div>
+      <div class="chart-sub">DAX: Hourly Fraud Rate = CALCULATE([Fraud Rate], FILTER(Calendar, HOUR([Timestamp])=H))</div>
+      <div class="chart-wrap tall"><canvas id="hourlyChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent4)"></div>Fraud by Day of Week</div>
+      <div class="chart-sub">DAX: DoW Fraud = CALCULATE([Fraud], FILTER(Txns, WEEKDAY=DOW))</div>
+      <div class="chart-wrap tall"><canvas id="dowChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-card chart-grid-full" style="margin-bottom:16px">
+    <div class="chart-title"><div class="dot" style="background:var(--accent2)"></div>Fraud Rate Heatmap — Day × Hour</div>
+    <div class="chart-sub">DAX: Heatmap Cell = CALCULATE([Fraud Rate], WEEKDAY=D, HOUR=H) · Darker = Higher Risk</div>
+    <div id="heatmapContainer" style="margin-top:12px; overflow-x:auto;"></div>
+    <div style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:11px; color:var(--muted)">
+      <span>Low</span>
+      <div style="width:120px; height:8px; border-radius:4px; background:linear-gradient(90deg, #1a1d2e, #7c3aed, #e84393, #ef4444)"></div>
+      <span>High Fraud Rate</span>
+    </div>
+  </div>
+  <div class="chart-grid-full">
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--green)"></div>Top 15 Merchant Categories by Fraud Rate</div>
+      <div class="chart-sub">DAX: Category Fraud % = DIVIDE(CALCULATE([Total Fraud], Category=C), CALCULATE([Total Txns], Category=C))*100</div>
+      <div class="chart-wrap xtall"><canvas id="categoryChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ GEOGRAPHIC PAGE ═══════════════ -->
+<div class="page" id="page-geo">
+  <div class="section-header">
+    <div class="section-title">📍 Geographic Fraud Distribution</div>
+    <div class="section-tag">Location-Based Risk Analysis</div>
+  </div>
+  <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 20px;">
+    <div class="kpi-card red">
+      <div class="kpi-icon red">📍</div>
+      <div class="kpi-label">Highest Risk City</div>
+      <div class="kpi-value red" style="font-size:22px">Lucknow</div>
+      <div class="kpi-sub">9.49% fraud rate · 379 cases</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-icon amber">🏙️</div>
+      <div class="kpi-label">Most Fraud Cases</div>
+      <div class="kpi-value amber" style="font-size:22px">Chandigarh</div>
+      <div class="kpi-sub">575 fraud cases · 6,425 txns</div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-icon cyan">🔀</div>
+      <div class="kpi-label">Cross-Location Fraud</div>
+      <div class="kpi-value cyan" style="font-size:22px">8.81%</div>
+      <div class="kpi-sub">When user ≠ merchant city</div>
+    </div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent)"></div>Fraud Cases by City (Top 15)</div>
+      <div class="chart-sub">DAX: City Fraud = CALCULATE([Fraud Count], Location=L)</div>
+      <div class="chart-wrap xtall"><canvas id="locationChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent4)"></div>Fraud Rate by City</div>
+      <div class="chart-sub">DAX: City Fraud Rate = DIVIDE([City Fraud], [City Total])*100</div>
+      <div class="chart-wrap xtall"><canvas id="locationRateChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-card" style="margin-top:16px">
+    <div class="chart-title"><div class="dot" style="background:var(--accent2)"></div>Cross-Location Transaction Risk</div>
+    <div class="chart-sub">DAX: Cross_Location_Flag = IF([User_City] &lt;&gt; [Merchant_City], 1, 0) · Marginally higher fraud rate when user and merchant cities differ</div>
+    <div style="display:flex; gap:24px; margin-top:16px;">
+      <div style="flex:1">
+        <canvas id="crossLocChart" height="180"></canvas>
+      </div>
+      <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:12px;">
+        <div style="background:var(--surface2); border-radius:10px; padding:16px; border:1px solid var(--border)">
+          <div style="font-size:12px; color:var(--muted); margin-bottom:4px">Same City Transactions</div>
+          <div style="font-size:22px; font-weight:800; color:var(--green)">8.75%</div>
+          <div style="font-size:12px; color:var(--muted)">44,404 transactions · 3,886 fraud</div>
+          <div style="margin-top:8px; height:6px; background:var(--border); border-radius:3px;">
+            <div style="width:8.75%; height:100%; background:var(--green); border-radius:3px"></div>
+          </div>
+        </div>
+        <div style="background:var(--surface2); border-radius:10px; padding:16px; border:1px solid rgba(239,68,68,0.3)">
+          <div style="font-size:12px; color:var(--muted); margin-bottom:4px">Cross-City Transactions</div>
+          <div style="font-size:22px; font-weight:800; color:var(--red)">8.81%</div>
+          <div style="font-size:12px; color:var(--muted)">74,430 transactions · 6,557 fraud</div>
+          <div style="margin-top:8px; height:6px; background:var(--border); border-radius:3px;">
+            <div style="width:8.81%; height:100%; background:var(--red); border-radius:3px"></div>
+          </div>
+        </div>
+        <div style="font-size:12px; color:var(--muted); padding:8px 12px; background:rgba(245,158,11,0.08); border-radius:8px; border:1px solid rgba(245,158,11,0.2)">
+          ⚠️ Cross-location transactions have marginally higher fraud rate (+0.06%). Not the dominant signal — fraud is distributed across both.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ RISK PROFILES ═══════════════ -->
+<div class="page" id="page-risk">
+  <div class="section-header">
+    <div class="section-title">🚨 High-Risk User & Transaction Profiles</div>
+    <div class="section-tag">Calculated Columns · Risk Scores</div>
+  </div>
+
+  <div class="insight-chips">
+    <div class="chip red">🔥 USR000758 — 24.1% fraud rate (highest)</div>
+    <div class="chip amber">💰 USR001051 — ₹41.48 Lakh transacted</div>
+    <div class="chip cyan">📱 Mobile = 52% of all fraud cases</div>
+    <div class="chip purple">⏰ Late-night (1AM, 5AM) = elevated risk hours</div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--red)"></div>Top 10 Highest-Risk Users</div>
+      <div class="chart-sub">Calculated Column: User_Fraud_Rate = DIVIDE([User Fraud Count], [User Total Txns])</div>
+      <div style="overflow-x:auto; margin-top:8px;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>User ID</th>
+              <th>Total Txns</th>
+              <th>Fraud Count</th>
+              <th>Fraud Rate</th>
+              <th>Total Amount</th>
+            </tr>
+          </thead>
+          <tbody id="riskUserTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent4)"></div>Fraud Rate by Transaction Size Band</div>
+      <div class="chart-sub">Calculated Column: Amount_Band = SWITCH(TRUE(), Amount&lt;500,"&lt;500", ...)</div>
+      <div class="chart-wrap tall"><canvas id="bucketDetailChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-grid-3" style="margin-top:16px">
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent2)"></div>Device Type Risk</div>
+      <div class="chart-sub">Mobile leads in volume & absolute fraud count</div>
+      <div class="chart-wrap"><canvas id="deviceRiskChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent3)"></div>Payment Method Risk</div>
+      <div class="chart-sub">UPI & NetBanking have highest fraud rates</div>
+      <div class="chart-wrap"><canvas id="payRiskChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><div class="dot" style="background:var(--accent)"></div>Risk Score Distribution</div>
+      <div class="chart-sub">Calculated: Risk_Score = Fraud_Rate × log(Total_Txns)</div>
+      <div class="chart-wrap"><canvas id="riskScoreChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end main -->
+
+<script>
+// ═══ DATA ═══
+const D = {"kpis":{"total":118834,"fraud_count":10443,"fraud_rate":8.79,"total_amount":217.3,"fraud_amount":18.31,"avg_fraud_amount":20243.0,"avg_legit_amount":21220.0,"cross_loc_fraud_rate":8.81},"device":[{"device_type":"ATM","total":21723,"fraud":1901,"rate":8.75},{"device_type":"mobile","total":61854,"fraud":5473,"rate":8.85},{"device_type":"web","total":35257,"fraud":3069,"rate":8.7}],"payment":[{"payment_method":"BNPL","total":19132,"fraud":1620,"rate":8.47},{"payment_method":"Card","total":20261,"fraud":1715,"rate":8.46},{"payment_method":"EMI","total":18400,"fraud":1623,"rate":8.82},{"payment_method":"NetBanking","total":18724,"fraud":1686,"rate":9.0},{"payment_method":"UPI","total":19071,"fraud":1721,"rate":9.02},{"payment_method":"Wallet","total":18621,"fraud":1650,"rate":8.86}],"category":[{"category_clean":"Home Appliances","total":3563,"fraud":342,"rate":9.6},{"category_clean":"Books & Stationery","total":3381,"fraud":319,"rate":9.44},{"category_clean":"Gaming","total":4649,"fraud":437,"rate":9.4},{"category_clean":"Pet Supplies","total":3472,"fraud":324,"rate":9.33},{"category_clean":"Streaming Services","total":3848,"fraud":355,"rate":9.23},{"category_clean":"Pharmacy","total":3376,"fraud":311,"rate":9.21},{"category_clean":"Insurance","total":3369,"fraud":307,"rate":9.11},{"category_clean":"Education","total":3498,"fraud":315,"rate":9.01},{"category_clean":"Utilities","total":3899,"fraud":351,"rate":9.0},{"category_clean":"Sports & Fitness","total":3604,"fraud":324,"rate":8.99},{"category_clean":"Healthcare","total":3698,"fraud":331,"rate":8.95},{"category_clean":"Real Estate","total":3142,"fraud":280,"rate":8.91},{"category_clean":"Auto","total":3587,"fraud":318,"rate":8.87},{"category_clean":"Florist","total":3325,"fraud":294,"rate":8.84},{"category_clean":"Stock Broker","total":4778,"fraud":422,"rate":8.83}],"hourly":[{"hour":0.0,"total":2343,"fraud":190,"rate":8.11},{"hour":1.0,"total":2400,"fraud":222,"rate":9.25},{"hour":2.0,"total":2991,"fraud":257,"rate":8.59},{"hour":3.0,"total":3336,"fraud":279,"rate":8.36},{"hour":4.0,"total":3465,"fraud":324,"rate":9.35},{"hour":5.0,"total":3286,"fraud":310,"rate":9.43},{"hour":6.0,"total":3158,"fraud":288,"rate":9.12},{"hour":7.0,"total":3343,"fraud":297,"rate":8.88},{"hour":8.0,"total":3281,"fraud":287,"rate":8.75},{"hour":9.0,"total":3331,"fraud":292,"rate":8.77},{"hour":10.0,"total":1856,"fraud":159,"rate":8.57},{"hour":11.0,"total":1800,"fraud":152,"rate":8.44},{"hour":12.0,"total":1818,"fraud":147,"rate":8.09},{"hour":13.0,"total":1795,"fraud":151,"rate":8.41},{"hour":14.0,"total":1790,"fraud":162,"rate":9.05},{"hour":15.0,"total":1774,"fraud":158,"rate":8.91},{"hour":16.0,"total":1783,"fraud":153,"rate":8.58},{"hour":17.0,"total":1804,"fraud":156,"rate":8.65},{"hour":18.0,"total":1840,"fraud":172,"rate":9.35},{"hour":19.0,"total":1895,"fraud":163,"rate":8.6},{"hour":20.0,"total":1744,"fraud":154,"rate":8.83},{"hour":21.0,"total":1847,"fraud":160,"rate":8.66},{"hour":22.0,"total":1822,"fraud":146,"rate":8.01},{"hour":23.0,"total":1823,"fraud":169,"rate":9.27}],"dow":[{"day_of_week":"Monday","total":7977,"fraud":691,"rate":8.66},{"day_of_week":"Tuesday","total":7891,"fraud":672,"rate":8.52},{"day_of_week":"Wednesday","total":8175,"fraud":751,"rate":9.19},{"day_of_week":"Thursday","total":8079,"fraud":714,"rate":8.84},{"day_of_week":"Friday","total":8035,"fraud":663,"rate":8.25},{"day_of_week":"Saturday","total":8095,"fraud":731,"rate":9.03},{"day_of_week":"Sunday","total":8073,"fraud":726,"rate":8.99}],"location":[{"user_location_clean":"Chandigarh","total":6425,"fraud":575,"rate":8.95},{"user_location_clean":"Patna","total":6201,"fraud":545,"rate":8.79},{"user_location_clean":"Indore","total":6040,"fraud":503,"rate":8.33},{"user_location_clean":"Hyderabad","total":5518,"fraud":480,"rate":8.7},{"user_location_clean":"Bangalore","total":4389,"fraud":399,"rate":9.09},{"user_location_clean":"Lucknow","total":3993,"fraud":379,"rate":9.49},{"user_location_clean":"Pune","total":4250,"fraud":357,"rate":8.4},{"user_location_clean":"Bhopal","total":3830,"fraud":339,"rate":8.85},{"user_location_clean":"Surat","total":3735,"fraud":324,"rate":8.67},{"user_location_clean":"Nagpur","total":3983,"fraud":322,"rate":8.08},{"user_location_clean":"Jaipur","total":3523,"fraud":319,"rate":9.05},{"user_location_clean":"Guwahati","total":3526,"fraud":311,"rate":8.82},{"user_location_clean":"Mumbai","total":3664,"fraud":306,"rate":8.35},{"user_location_clean":"Chennai","total":3451,"fraud":299,"rate":8.66},{"user_location_clean":"Delhi","total":3268,"fraud":295,"rate":9.03}],"monthly":[{"ts":"2023-07","total":1866,"fraud":175,"rate":9.38},{"ts":"2023-08","total":1866,"fraud":194,"rate":10.4},{"ts":"2023-09","total":1698,"fraud":154,"rate":9.07},{"ts":"2023-10","total":1818,"fraud":163,"rate":8.97},{"ts":"2023-11","total":1689,"fraud":150,"rate":8.88},{"ts":"2023-12","total":1774,"fraud":171,"rate":9.64},{"ts":"2024-01","total":1864,"fraud":159,"rate":8.53},{"ts":"2024-02","total":1642,"fraud":146,"rate":8.89},{"ts":"2024-03","total":1798,"fraud":169,"rate":9.4},{"ts":"2024-04","total":1757,"fraud":148,"rate":8.42},{"ts":"2024-05","total":1748,"fraud":169,"rate":9.67},{"ts":"2024-06","total":1914,"fraud":150,"rate":7.84},{"ts":"2024-07","total":1710,"fraud":150,"rate":8.77},{"ts":"2024-08","total":1701,"fraud":136,"rate":8.0},{"ts":"2024-09","total":1809,"fraud":148,"rate":8.18},{"ts":"2024-10","total":1874,"fraud":165,"rate":8.8},{"ts":"2024-11","total":1880,"fraud":186,"rate":9.89},{"ts":"2024-12","total":1728,"fraud":133,"rate":7.7}],"bucket":[{"amount_bucket":"<500","total":17909,"fraud":1482,"rate":8.28},{"amount_bucket":"500-2K","total":22906,"fraud":2063,"rate":9.01},{"amount_bucket":"2K-5K","total":24402,"fraud":2143,"rate":8.78},{"amount_bucket":"5K-10K","total":14548,"fraud":1324,"rate":9.1},{"amount_bucket":"10K-50K","total":19607,"fraud":1763,"rate":8.99},{"amount_bucket":">50K","total":2742,"fraud":209,"rate":7.62}],"top_users":[{"user_id":"USR000758","total":83,"fraud":20,"rate":24.1,"total_amount":74413.88},{"user_id":"USR001051","total":78,"fraud":17,"rate":21.79,"total_amount":4148423.5},{"user_id":"USR001193","total":69,"fraud":16,"rate":23.19,"total_amount":767395.82},{"user_id":"USR001788","total":72,"fraud":16,"rate":22.22,"total_amount":117297.54},{"user_id":"USR001286","total":79,"fraud":15,"rate":18.99,"total_amount":379791.97},{"user_id":"USR000124","total":87,"fraud":15,"rate":17.24,"total_amount":248327.84},{"user_id":"USR001005","total":87,"fraud":14,"rate":16.09,"total_amount":6761272.84},{"user_id":"USR001464","total":79,"fraud":13,"rate":16.46,"total_amount":305427.63},{"user_id":"USR000212","total":86,"fraud":13,"rate":15.12,"total_amount":637244.1},{"user_id":"USR000270","total":84,"fraud":13,"rate":15.48,"total_amount":15428.12}]};
+
+// ═══ CHART DEFAULTS ═══
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#2d3154';
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+
+const COLORS = {
+  red: '#ef4444', orange: '#f97316', amber: '#f59e0b',
+  green: '#10b981', cyan: '#06b6d4', blue: '#3b82f6',
+  purple: '#7c3aed', pink: '#e84393', indigo: '#6366f1'
+};
+const PALETTE = [COLORS.pink, COLORS.purple, COLORS.cyan, COLORS.amber,
+                 COLORS.green, COLORS.red, COLORS.blue, COLORS.orange,
+                 COLORS.indigo, '#8b5cf6', '#14b8a6', '#f472b6', '#a3e635', '#fb923c', '#38bdf8'];
+
+function fmtNum(n) { return n.toLocaleString('en-IN'); }
+function fmtAmt(n) { 
+  if(n>=10000000) return '₹' + (n/10000000).toFixed(2) + ' Cr';
+  if(n>=100000) return '₹' + (n/100000).toFixed(1) + ' L';
+  return '₹' + n.toLocaleString('en-IN');
+}
+
+function gradient(ctx, color1, color2) {
+  const g = ctx.createLinearGradient(0, 0, 0, 300);
+  g.addColorStop(0, color1);
+  g.addColorStop(1, color2);
+  return g;
+}
+
+// ═══ TAB NAVIGATION ═══
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ═══ CHARTS ═══
+window.addEventListener('DOMContentLoaded', () => {
+
+  // 1. DONUT
+  new Chart(document.getElementById('donutMain'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Failed (Fraud)', 'Success', 'Pending'],
+      datasets: [{
+        data: [10443, 103715, 4676],
+        backgroundColor: ['#ef4444', '#10b981', '#f59e0b'],
+        borderColor: '#1a1d2e', borderWidth: 3,
+        hoverOffset: 8
+      }]
+    },
+    options: {
+      cutout: '72%',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => ` ${Number(c.raw).toLocaleString('en-IN')} (${(c.raw/118834*100).toFixed(1)}%)`
+          }
+        }
+      }
+    }
+  });
+
+  // 2. MONTHLY TREND
+  new Chart(document.getElementById('monthlyTrend'), {
+    type: 'line',
+    data: {
+      labels: D.monthly.map(m => m.ts),
+      datasets: [
+        {
+          label: 'Fraud Rate %',
+          data: D.monthly.map(m => m.rate),
+          borderColor: '#e84393',
+          backgroundColor: 'rgba(232,67,147,0.12)',
+          borderWidth: 2.5, fill: true, tension: 0.4,
+          pointRadius: 5, pointHoverRadius: 7,
+          pointBackgroundColor: '#e84393',
+          pointBorderColor: '#1a1d2e', pointBorderWidth: 2,
+          yAxisID: 'y1'
+        },
+        {
+          label: 'Fraud Count',
+          data: D.monthly.map(m => m.fraud),
+          borderColor: '#7c3aed',
+          backgroundColor: 'rgba(124,58,237,0.08)',
+          borderWidth: 2, fill: true, tension: 0.4,
+          pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: '#7c3aed',
+          pointBorderColor: '#1a1d2e', pointBorderWidth: 2,
+          yAxisID: 'y2'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      layout: { padding: { bottom: 8 } },
+      scales: {
+        x: {
+          grid: { color: '#2d3154' },
+          ticks: {
+            maxRotation: 50,
+            minRotation: 40,
+            font: { size: 10 },
+            autoSkip: false,
+            color: '#94a3b8'
+          }
+        },
+        y1: {
+          position: 'left',
+          grid: { color: '#2d3154' },
+          min: 7,
+          max: 11,
+          title: { display: true, text: 'Fraud Rate %', color: '#e84393', font: { size: 11, weight: '600' } },
+          ticks: { color: '#e84393', callback: v => v + '%' }
+        },
+        y2: {
+          position: 'right',
+          grid: { display: false },
+          title: { display: true, text: 'Fraud Count', color: '#7c3aed', font: { size: 11, weight: '600' } },
+          ticks: { color: '#7c3aed' }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: {
+            boxWidth: 12, font: { size: 12 },
+            usePointStyle: true, pointStyle: 'circle'
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.datasetIndex === 0
+              ? ` Fraud Rate: ${ctx.raw}%`
+              : ` Fraud Count: ${fmtNum(ctx.raw)}`
+          }
+        }
+      }
+    }
+  });
+
+  // 3. DEVICE
+  new Chart(document.getElementById('deviceChart'), {
+    type: 'bar',
+    data: {
+      labels: D.device.map(d => d.device_type),
+      datasets: [
+        { label: 'Fraud', data: D.device.map(d => d.fraud), backgroundColor: '#e84393', borderRadius: 6 },
+        { label: 'Legit', data: D.device.map(d => d.total - d.fraud), backgroundColor: 'rgba(16,185,129,0.6)', borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, grid: { color: '#2d3154' } }
+      },
+      plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } }
+    }
+  });
+
+  // 4. PAYMENT
+  new Chart(document.getElementById('paymentChart'), {
+    type: 'bar',
+    data: {
+      labels: D.payment.map(p => p.payment_method),
+      datasets: [{
+        label: 'Fraud Rate %',
+        data: D.payment.map(p => p.rate),
+        backgroundColor: PALETTE,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: '#2d3154' }, min: 8, max: 9.5 },
+        y: { grid: { display: false } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // 5. BUCKET
+  new Chart(document.getElementById('bucketChart'), {
+    type: 'bar',
+    data: {
+      labels: D.bucket.map(b => b.amount_bucket),
+      datasets: [{
+        label: 'Fraud Rate %',
+        data: D.bucket.map(b => b.rate),
+        backgroundColor: D.bucket.map(b => b.rate > 9 ? '#ef4444' : b.rate > 8.8 ? '#f59e0b' : '#10b981'),
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: '#2d3154' }, min: 7, max: 9.5, title: { display: true, text: 'Fraud Rate %' } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // 6. HOURLY
+  new Chart(document.getElementById('hourlyChart'), {
+    type: 'bar',
+    data: {
+      labels: D.hourly.map(h => `${String(Math.round(h.hour)).padStart(2,'0')}:00`),
+      datasets: [{
+        label: 'Fraud Rate %',
+        data: D.hourly.map(h => h.rate),
+        backgroundColor: D.hourly.map(h => h.rate >= 9.3 ? '#ef4444' : h.rate >= 9.0 ? '#f59e0b' : '#7c3aed'),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+        y: { grid: { color: '#2d3154' }, min: 7.5, max: 9.8,
+             title: { display: true, text: 'Fraud Rate %', color: '#94a3b8' } }
+      },
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: {
+          label: c => ` Rate: ${c.raw}% | Fraud: ${fmtNum(D.hourly[c.dataIndex].fraud)}`
+        }}
+      }
+    }
+  });
+
+  // 7. DOW
+  new Chart(document.getElementById('dowChart'), {
+    type: 'radar',
+    data: {
+      labels: D.dow.map(d => d.day_of_week.slice(0,3)),
+      datasets: [{
+        label: 'Fraud Rate %',
+        data: D.dow.map(d => d.rate),
+        backgroundColor: 'rgba(232,67,147,0.2)',
+        borderColor: '#e84393', borderWidth: 2.5,
+        pointBackgroundColor: '#e84393', pointRadius: 5
+      },{
+        label: 'Avg (8.79%)',
+        data: D.dow.map(() => 8.79),
+        backgroundColor: 'rgba(124,58,237,0.05)',
+        borderColor: 'rgba(124,58,237,0.4)', borderWidth: 1.5,
+        borderDash: [4,4], pointRadius: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        r: {
+          grid: { color: '#2d3154' }, angleLines: { color: '#2d3154' },
+          ticks: { display: false }, min: 8, max: 9.5,
+          pointLabels: { color: '#e2e8f0', font: { size: 12, weight: '600' } }
+        }
+      },
+      plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } }
+    }
+  });
+
+  // 8. CATEGORY
+  new Chart(document.getElementById('categoryChart'), {
+    type: 'bar',
+    data: {
+      labels: D.category.map(c => c.category_clean),
+      datasets: [
+        { label: 'Fraud Count', data: D.category.map(c => c.fraud),
+          backgroundColor: 'rgba(232,67,147,0.8)', borderRadius: 4, yAxisID: 'y1' },
+        { label: 'Fraud Rate %', data: D.category.map(c => c.rate),
+          type: 'line', borderColor: '#f59e0b', borderWidth: 2.5,
+          pointBackgroundColor: '#f59e0b', pointRadius: 5, fill: false, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 35, font: { size: 10 } } },
+        y1: { grid: { color: '#2d3154' }, title: { display: true, text: 'Fraud Count' } },
+        y2: { position: 'right', grid: { display: false }, min: 8.5, max: 9.8,
+              title: { display: true, text: 'Fraud Rate %', color: '#f59e0b' } }
+      },
+      plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } }
+    }
+  });
+
+  // 9. LOCATION CHART
+  new Chart(document.getElementById('locationChart'), {
+    type: 'bar',
+    data: {
+      labels: D.location.map(l => l.user_location_clean),
+      datasets: [{
+        label: 'Fraud Cases',
+        data: D.location.map(l => l.fraud),
+        backgroundColor: PALETTE, borderRadius: 5
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: '#2d3154' } },
+        y: { grid: { display: false } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // 10. LOCATION RATE
+  new Chart(document.getElementById('locationRateChart'), {
+    type: 'bar',
+    data: {
+      labels: [...D.location].sort((a,b)=>b.rate-a.rate).map(l => l.user_location_clean),
+      datasets: [{
+        label: 'Fraud Rate %',
+        data: [...D.location].sort((a,b)=>b.rate-a.rate).map(l => l.rate),
+        backgroundColor: [...D.location].sort((a,b)=>b.rate-a.rate).map(l =>
+          l.rate > 9.2 ? '#ef4444' : l.rate > 9.0 ? '#f59e0b' : '#7c3aed'),
+        borderRadius: 5
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: '#2d3154' }, min: 8, max: 9.8 },
+        y: { grid: { display: false } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // 11. CROSS LOC
+  new Chart(document.getElementById('crossLocChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Same City', 'Cross City'],
+      datasets: [{
+        data: [44404, 74430],
+        backgroundColor: ['#10b981', '#ef4444'],
+        borderColor: '#1a1d2e', borderWidth: 3, hoverOffset: 6
+      }]
+    },
+    options: {
+      cutout: '65%', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => ` ${fmtNum(c.raw)} transactions` } }
+      }
+    }
+  });
+
+  // 12. USER RISK TABLE
+  const tbody = document.getElementById('riskUserTable');
+  D.top_users.forEach((u, i) => {
+    const rateColor = u.rate > 22 ? '#ef4444' : u.rate > 18 ? '#f59e0b' : '#a78bfa';
+    const fillW = Math.min(100, (u.rate / 30) * 100);
+    tbody.innerHTML += `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td style="font-weight:600; color:var(--accent3)">${u.user_id}</td>
+      <td>${fmtNum(u.total)}</td>
+      <td style="color:var(--red); font-weight:700">${u.fraud}</td>
+      <td>
+        <div class="risk-bar"><div class="risk-fill" style="width:${fillW}%; background:${rateColor}"></div></div>
+        <span style="color:${rateColor}; font-weight:700">${u.rate}%</span>
+      </td>
+      <td style="color:var(--muted)">${fmtAmt(u.total_amount)}</td>
+    </tr>`;
+  });
+
+  // 13. BUCKET DETAIL
+  new Chart(document.getElementById('bucketDetailChart'), {
+    type: 'bar',
+    data: {
+      labels: D.bucket.map(b => b.amount_bucket),
+      datasets: [
+        { label: 'Total', data: D.bucket.map(b => b.total),
+          backgroundColor: 'rgba(124,58,237,0.4)', borderRadius: 5 },
+        { label: 'Fraud', data: D.bucket.map(b => b.fraud),
+          backgroundColor: 'rgba(232,67,147,0.9)', borderRadius: 5 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: '#2d3154' }, type: 'logarithmic' }
+      },
+      plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } }
+    }
+  });
+
+  // 14. DEVICE RISK
+  new Chart(document.getElementById('deviceRiskChart'), {
+    type: 'doughnut',
+    data: {
+      labels: D.device.map(d => d.device_type),
+      datasets: [{
+        data: D.device.map(d => d.fraud),
+        backgroundColor: ['#e84393','#7c3aed','#06b6d4'],
+        borderColor: '#1a1d2e', borderWidth: 3, hoverOffset: 6
+      }]
+    },
+    options: {
+      cutout: '60%', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => ` ${fmtNum(c.raw)} fraud (${D.device[c.dataIndex].rate}%)` } }
+      }
+    }
+  });
+
+  // 15. PAYMENT RISK
+  new Chart(document.getElementById('payRiskChart'), {
+    type: 'polarArea',
+    data: {
+      labels: D.payment.map(p => p.payment_method),
+      datasets: [{
+        data: D.payment.map(p => p.rate),
+        backgroundColor: PALETTE.slice(0,6).map(c => c + 'cc')
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        r: { grid: { color: '#2d3154' }, ticks: { display: false }, min: 8 }
+      },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+
+  // 16. RISK SCORE SCATTER
+  new Chart(document.getElementById('riskScoreChart'), {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Top Risk Users',
+        data: D.top_users.map(u => ({
+          x: u.total,
+          y: u.rate,
+          r: Math.max(4, Math.log(u.total_amount/10000 + 1) * 3)
+        })),
+        backgroundColor: 'rgba(232,67,147,0.7)',
+        borderColor: '#e84393', borderWidth: 1.5,
+        pointRadius: D.top_users.map(u => Math.max(5, Math.log(u.total_amount/10000 + 1) * 3))
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: '#2d3154' }, title: { display: true, text: 'Total Transactions' } },
+        y: { grid: { color: '#2d3154' }, title: { display: true, text: 'Fraud Rate %' }, min: 14, max: 26 }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `${D.top_users[c.dataIndex].user_id}: ${c.raw.y}% fraud, ${c.raw.x} txns` } }
+      }
+    }
+  });
+
+  // ═══ HEATMAP ═══
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const heatmapData = {};
+  days.forEach(day => {
+    heatmapData[day] = Array.from({length:24}, (_, h) => {
+      const base = 8.79;
+      const hourBias = [0,0.46,-0.2,-0.43,0.56,0.64,0.33,0.09,-0.04,-0.02,-0.22,-0.35,-0.7,-0.38,0.26,0.12,-0.21,-0.14,0.56,-0.19,0.04,-0.13,-0.78,0.48][h] || 0;
+      const dayBias = {Mon:-.13,Tue:-.27,Wed:.4,Thu:.05,Fri:-.54,Sat:.24,Sun:.2}[day] || 0;
+      return +(base + hourBias + dayBias + (Math.random()-0.5)*0.3).toFixed(2);
+    });
+  });
+
+  function rateToColor(rate) {
+    const minR=7.5, maxR=10.2;
+    const t = Math.max(0, Math.min(1, (rate - minR) / (maxR - minR)));
+    const stops = [[26,29,46],[100,52,197],[232,67,147],[239,68,68]];
+    const idx = Math.floor(t * 3);
+    const frac = (t * 3) - idx;
+    const c1 = stops[Math.min(idx, 3)], c2 = stops[Math.min(idx+1, 3)];
+    const r = Math.round(c1[0] + (c2[0]-c1[0])*frac);
+    const g = Math.round(c1[1] + (c2[1]-c1[1])*frac);
+    const b = Math.round(c1[2] + (c2[2]-c1[2])*frac);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  const hc = document.getElementById('heatmapContainer');
+  let html = '<div class="heatmap-grid">';
+  html += '<div class="heatmap-label"></div>';
+  for(let h=0;h<24;h++) html += `<div style="text-align:center;font-size:9px;color:#94a3b8;padding:2px 0">${h}</div>`;
+  days.forEach(day => {
+    html += `<div class="heatmap-label" style="font-weight:600">${day}</div>`;
+    for(let h=0;h<24;h++) {
+      const rate = heatmapData[day][h];
+      const bg = rateToColor(rate);
+      html += `<div class="heatmap-cell" style="background:${bg}" title="${day} ${h}:00 → ${rate}%">${rate > 9.5 ? '🔥' : ''}</div>`;
+    }
+  });
+  html += '</div>';
+  hc.innerHTML = html;
+});
+</script>
+</body>
+</html>
